@@ -1,7 +1,5 @@
 package com.example.transfer.service;
 
-import com.example.transfer.dto.BatchTransferRequestDto;
-import com.example.transfer.dto.BatchTransferResponseDto;
 import com.example.transfer.dto.LedgerTransferRequest;
 import com.example.transfer.dto.LedgerTransferResponse;
 import com.example.transfer.dto.TransferRequestDto;
@@ -13,6 +11,8 @@ import com.example.transfer.exception.NotFoundException;
 import com.example.transfer.repository.IdempotencyKeyRepository;
 import com.example.transfer.repository.TransferRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,33 +20,28 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Base64;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.Map;
 
 @Service
 public class TransferService {
 
+    private static final Logger log = LoggerFactory.getLogger(TransferService.class);
     private final TransferRepository transferRepository;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
-    private final LedgerClient ledgerClient;
+    private final ResilientLedgerClient resilientLedgerClient;
     private final ObjectMapper objectMapper;
 
     private final int ttlHours;
 
     public TransferService(TransferRepository transferRepository,
                            IdempotencyKeyRepository idempotencyKeyRepository,
-                           LedgerClient ledgerClient,
+                           ResilientLedgerClient resilientLedgerClient,
                            ObjectMapper objectMapper,
                            @Value("${app.idempotency.ttl-hours:24}") int ttlHours) {
         this.transferRepository = transferRepository;
         this.idempotencyKeyRepository = idempotencyKeyRepository;
-        this.ledgerClient = ledgerClient;
+        this.resilientLedgerClient = resilientLedgerClient;
         this.objectMapper = objectMapper;
         this.ttlHours = ttlHours;
     }
@@ -87,9 +82,9 @@ public class TransferService {
         transfer.setAmount(request.amount());
         transfer = transferRepository.saveAndFlush(transfer);
 
-        LedgerTransferResponse ledgerResp = ledgerClient.postTransfer(
+        LedgerTransferResponse ledgerResp = resilientLedgerClient.postTransfer(
                 new LedgerTransferRequest(request.fromAccountId(), request.toAccountId(), request.amount(), transfer.getId())
-        );
+        ).join();
 
         if ("FAILURE".equalsIgnoreCase(ledgerResp.status())) {
             transfer.setStatus(Transfer.Status.FAILED);
@@ -100,46 +95,20 @@ public class TransferService {
         }
         transferRepository.save(transfer);
 
+        log.info("{}", Map.of(
+                "event", "transfer_result",
+                "transferId", transfer.getId(),
+                "status", transfer.getStatus(),
+                "fromAccountId", transfer.getFromAccountId(),
+                "toAccountId", transfer.getToAccountId(),
+                "amount", transfer.getAmount(),
+                "message", transfer.getMessage()
+        ));
+
         TransferResponseDto resp = toDto(transfer);
         persistResponse(marker, transfer.getId(), resp);
+        cleanupExpiredKeys();
         return resp;
-    }
-
-    @Transactional
-    public BatchTransferResponseDto processBatch(BatchTransferRequestDto batch) {
-        try (ExecutorService executor = createExecutor()) {
-            List<Callable<BatchTransferResponseDto.Result>> tasks = new ArrayList<>();
-            for (BatchTransferRequestDto.Item item : batch.items()) {
-                tasks.add(() -> {
-                    TransferResponseDto resp = createTransfer(item.transfer(), item.idempotencyKey());
-                    return new BatchTransferResponseDto.Result(item.idempotencyKey(), resp);
-                });
-            }
-
-            List<Future<BatchTransferResponseDto.Result>> futures = executor.invokeAll(tasks);
-            List<BatchTransferResponseDto.Result> results = new ArrayList<>();
-            for (Future<BatchTransferResponseDto.Result> f : futures) {
-                try {
-                    results.add(f.get());
-                } catch (ExecutionException ex) {
-                    Throwable cause = ex.getCause();
-                    TransferResponseDto failed = new TransferResponseDto(
-                            null, "FAILED", null, null, null, Instant.now(),
-                            cause.getMessage()
-                    );
-                    results.add(new BatchTransferResponseDto.Result(null, failed));
-                }
-            }
-            return new BatchTransferResponseDto(results);
-
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Batch interrupted", ie);
-        }
-    }
-
-    private ExecutorService createExecutor() {
-        return Executors.newVirtualThreadPerTaskExecutor();
     }
 
     private void persistResponse(IdempotencyKey marker, String transferId, TransferResponseDto resp) {
@@ -150,6 +119,11 @@ public class TransferService {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void cleanupExpiredKeys() {
+        Instant cutoff = Instant.now().minusSeconds(ttlHours * 3600L);
+        idempotencyKeyRepository.deleteByCreatedAtBefore(cutoff);
     }
 
     private TransferResponseDto toDto(Transfer t) {

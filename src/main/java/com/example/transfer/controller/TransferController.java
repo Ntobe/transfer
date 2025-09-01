@@ -4,8 +4,10 @@ import com.example.transfer.dto.BatchTransferRequestDto;
 import com.example.transfer.dto.BatchTransferResponseDto;
 import com.example.transfer.dto.TransferRequestDto;
 import com.example.transfer.dto.TransferResponseDto;
+import com.example.transfer.service.BatchTransferService;
 import com.example.transfer.service.TransferService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,15 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+@RequiredArgsConstructor
 public class TransferController {
 
     private static final String IDEM_HEADER = "Idempotency-Key";
 
     private final TransferService transferService;
-
-    public TransferController(TransferService transferService) {
-        this.transferService = transferService;
-    }
+    private final BatchTransferService batchTransferService;
 
     @PostMapping(path = "/v1/transfers", consumes = MediaType.APPLICATION_JSON_VALUE)
     public TransferResponseDto create(@RequestHeader(IDEM_HEADER) String idemKey,
@@ -40,6 +40,6 @@ public class TransferController {
 
     @PostMapping(path = "/v1/transfers/batch", consumes = MediaType.APPLICATION_JSON_VALUE)
     public BatchTransferResponseDto batch(@Valid @RequestBody BatchTransferRequestDto body) {
-        return transferService.processBatch(body);
+        return batchTransferService.processBatch(body);
     }
 }
