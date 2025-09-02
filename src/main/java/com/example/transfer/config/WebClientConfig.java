@@ -1,5 +1,6 @@
 package com.example.transfer.config;
 
+import io.netty.channel.ChannelOption;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,10 +16,11 @@ public class WebClientConfig {
     @Bean
     public WebClient ledgerWebClient(
             @Value("${app.ledger.base-url}") String baseUrl,
-            @Value("${app.ledger.connect-timeout-ms}") long connectTimeoutMs,
+            @Value("${app.ledger.connect-timeout-ms}") int connectTimeoutMs,
             @Value("${app.ledger.read-timeout-ms}") long readTimeoutMs) {
 
         HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMs)
                 .responseTimeout(Duration.ofMillis(readTimeoutMs));
 
         return WebClient.builder()
