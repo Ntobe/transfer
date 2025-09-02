@@ -54,11 +54,11 @@ public class TransferService {
 
     @Transactional
     public TransferResponseDto createTransfer(TransferRequestDto request, String idempotencyKey) {
-        String reqHash = hashRequest(request);
+        String requestHash = hashRequest(request);
 
         IdempotencyKey existing = idempotencyKeyRepository.findByKey(idempotencyKey).orElse(null);
         if (existing != null) {
-            if (!existing.getRequestHash().equals(reqHash)) {
+            if (!existing.getRequestHash().equals(requestHash)) {
                 throw new ConflictException("Idempotency-Key reused with different request body");
             }
             try {
@@ -71,7 +71,7 @@ public class TransferService {
         // create placeholder idempotency row to prevent concurrent duplicates
         IdempotencyKey marker = new IdempotencyKey();
         marker.setKey(idempotencyKey);
-        marker.setRequestHash(reqHash);
+        marker.setRequestHash(requestHash);
         marker = idempotencyKeyRepository.saveAndFlush(marker);
 
         // Create transfer and call ledger in same transaction boundary for our own state;
@@ -129,12 +129,7 @@ public class TransferService {
     private TransferResponseDto toDto(Transfer t) {
         return new TransferResponseDto(
                 t.getId(),
-                t.getStatus().name(),
-                t.getFromAccountId(),
-                t.getToAccountId(),
-                t.getAmount(),
-                t.getCreatedAt(),
-                t.getMessage()
+                t.getStatus().name()
         );
     }
 

@@ -37,13 +37,13 @@ public class Transfer {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Status status = Status.PENDING;
+    private Status status;
 
     @Column
     private String message;
 
     public enum Status {
-        PENDING, COMPLETED, FAILED
+        COMPLETED, FAILED
     }
 }
 

@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: Transfer
+  datasource:
+    url: jdbc:h2:mem:transferdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+server:
+  port: 8080
+
+app:
+  ledger:
+    base-url: http://localhost:8081
+    connect-timeout-ms: 2000
+    read-timeout-ms: 5000
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      ledger:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 2           # last 20 calls
+        minimumNumberOfCalls: 2
+        failureRateThreshold: 50        # % failures to open
+        slowCallDurationThreshold: 2s   # consider >2s slow
+        slowCallRateThreshold: 50
+        waitDurationInOpenState: 30s    # cool-off before half-open
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+  timelimiter:
+    instances:
+      ledger:
+        timeoutDuration: 3s

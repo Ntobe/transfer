@@ -5,6 +5,8 @@ import com.example.transfer.dto.TransferRequestDto;
 import com.example.transfer.dto.TransferResponseDto;
 import com.example.transfer.repository.IdempotencyKeyRepository;
 import com.example.transfer.repository.TransferRepository;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -26,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY) // H2 in-memory
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 class TransferServiceIntegrationTest {
 
     @Autowired
@@ -37,6 +39,9 @@ class TransferServiceIntegrationTest {
 
     @Autowired
     private IdempotencyKeyRepository idempotencyKeyRepository;
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
 
     @MockBean
     private LedgerClient ledgerClient; // mock external ledger
@@ -90,5 +95,26 @@ class TransferServiceIntegrationTest {
 
         // Both transfers are persisted
         assertEquals(2, transferRepository.count());
+    }
+
+    @Test
+    void testCircuitBreakerOpensAfterFailures() {
+        // Mock ledger client to always fail
+        Mockito.when(ledgerClient.postTransfer(Mockito.any()))
+                .thenThrow(new RuntimeException("Ledger unavailable"));
+
+        CircuitBreaker cb = circuitBreakerRegistry.circuitBreaker("ledger");
+
+        // Cause enough failures to trigger OPEN state
+        for (int i = 0; i < 3; i++) {
+            try {
+                transferService.createTransfer(request1, "cb-key-" + i);
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Verify breaker is OPEN
+        assertEquals(CircuitBreaker.State.OPEN, cb.getState(),
+                "Circuit breaker should be OPEN after repeated failures");
     }
 }

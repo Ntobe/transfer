@@ -22,13 +22,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class TransferController {
 
-    private static final String IDEM_HEADER = "Idempotency-Key";
+    private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 
     private final TransferService transferService;
     private final BatchTransferService batchTransferService;
 
     @PostMapping(path = "/v1/transfers", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public TransferResponseDto create(@RequestHeader(IDEM_HEADER) String idemKey,
+    public TransferResponseDto create(@RequestHeader(IDEMPOTENCY_KEY) String idemKey,
                                       @Valid @RequestBody TransferRequestDto body) {
         return transferService.createTransfer(body, idemKey);
     }
