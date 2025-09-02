@@ -36,7 +36,6 @@ public class Transfer {
     private Instant createdAt = Instant.now();
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private Status status;
 
     @Column

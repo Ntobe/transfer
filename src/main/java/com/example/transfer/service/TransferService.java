@@ -135,9 +135,9 @@ public class TransferService {
 
     private String hashRequest(TransferRequestDto request) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            String s = request.fromAccountId() + "|" + request.toAccountId() + "|" + request.amount().toPlainString();
-            byte[] dig = md.digest(s.getBytes(StandardCharsets.UTF_8));
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            String string = request.fromAccountId() + "|" + request.toAccountId() + "|" + request.amount().toPlainString();
+            byte[] dig = messageDigest.digest(string.getBytes(StandardCharsets.UTF_8));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(dig);
         } catch (Exception e) {
             throw new RuntimeException(e);

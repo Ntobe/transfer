@@ -37,10 +37,7 @@ public class BatchTransferService {
                     results.add(f.get());
                 } catch (ExecutionException ex) {
                     Throwable cause = ex.getCause();
-                    TransferResponseDto failed = new TransferResponseDto(
-                            null, "FAILED", null, null, null, Instant.now(),
-                            cause.getMessage()
-                    );
+                    TransferResponseDto failed = new TransferResponseDto(null, "FAILED");
                     results.add(new BatchTransferResponseDto.Result(null, failed));
                 }
             }

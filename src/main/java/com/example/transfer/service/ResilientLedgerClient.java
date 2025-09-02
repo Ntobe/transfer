@@ -22,18 +22,18 @@ public class ResilientLedgerClient {
 
     @CircuitBreaker(name = "ledger", fallbackMethod = "fallback")
     @TimeLimiter(name = "ledger")
-    public CompletableFuture<LedgerTransferResponse> postTransfer(LedgerTransferRequest req) {
+    public CompletableFuture<LedgerTransferResponse> postTransfer(LedgerTransferRequest request) {
         // Structured “attempt” log
         log.info("{}", Map.of(
                 "event", "ledger_call_attempt",
-                "fromAccountId", req.fromAccountId(),
-                "toAccountId", req.toAccountId(),
-                "amount", req.amount(),
-                "transferId", req.transferId()
+                "fromAccountId", request.fromAccountId(),
+                "toAccountId", request.toAccountId(),
+                "amount", request.amount(),
+                "transferId", request.transferId()
         ));
 
         // Wrap sync client in CompletableFuture for @TimeLimiter
-        return CompletableFuture.supplyAsync(() -> delegate.postTransfer(req));
+        return CompletableFuture.supplyAsync(() -> delegate.postTransfer(request));
     }
 
     // Fallback must match return type and accept Throwable last

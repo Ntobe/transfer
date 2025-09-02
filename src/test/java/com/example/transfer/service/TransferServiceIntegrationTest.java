@@ -7,6 +7,7 @@ import com.example.transfer.repository.IdempotencyKeyRepository;
 import com.example.transfer.repository.TransferRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
+@Transactional
 class TransferServiceIntegrationTest {
 
     @Autowired
@@ -64,12 +66,10 @@ class TransferServiceIntegrationTest {
         TransferResponseDto resp = transferService.createTransfer(request1, "key1");
 
         assertEquals("COMPLETED", resp.status());
-        assertEquals(request1.amount(), resp.amount());
-        assertEquals(request1.fromAccountId(), resp.fromAccountId());
-        assertEquals(request1.toAccountId(), resp.toAccountId());
 
         // Idempotency stored
         assertTrue(idempotencyKeyRepository.findByKey("key1").isPresent());
+        assertEquals(resp.transferId(), transferRepository.findAll().getFirst().getId());
     }
 
     @Test
