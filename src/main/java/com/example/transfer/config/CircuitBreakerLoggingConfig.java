@@ -17,8 +17,7 @@ public class CircuitBreakerLoggingConfig {
     private static final Logger log = LoggerFactory.getLogger(CircuitBreakerLoggingConfig.class);
 
     @Bean
-    public ApplicationRunner circuitBreakerEventLogger(
-            CircuitBreakerRegistry registry) {
+    public ApplicationRunner circuitBreakerEventLogger(CircuitBreakerRegistry registry) {
         return args -> {
             registry.getAllCircuitBreakers().forEach(cb -> {
                 cb.getEventPublisher()
