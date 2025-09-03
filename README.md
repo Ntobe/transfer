@@ -32,9 +32,7 @@ To access Swagger locally, start the application with the dev profile.
 ## Startup Instructions
 ### Prerequisites
 
-Java 21+
-
-Gradle
+Java 21
 
 ## Running Locally (H2)
 
